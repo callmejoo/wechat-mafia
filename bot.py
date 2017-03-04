@@ -88,6 +88,13 @@ def joinGame(name, userid):
                 conn = sqlite3.connect('mafia.db')
                 db = conn.cursor()
                 db.execute('insert into player (id, user_id, name, votable) values (?, ?, ?, 0)',(getId(), userid, name,))
+                db.execute('insert into player (id, user_id, name, votable) values (2, 556464, wq, 0)')
+                db.execute('insert into player (id, user_id, name, votable) values (3, 56464, w321q, 0)')
+                db.execute('insert into player (id, user_id, name, votable) values (4, 5464, wq23, 0)')
+                db.execute('insert into player (id, user_id, name, votable) values (5, 564614, w5q, 0)')
+                db.execute('insert into player (id, user_id, name, votable) values (6, 516464, w5641q, 0)')
+                db.execute('insert into player (id, user_id, name, votable) values (7, 562464, wq32, 0)')
+                db.execute('insert into player (id, user_id, name, votable) values (8, 564164, w1q, 0)')
                 db.close()
                 conn.commit()
                 conn.close() 
@@ -173,11 +180,10 @@ def startGame():
                 conn.close()
                 sendGroup(groupName, '游戏即将在10秒内开始，已将各位的身份私聊发送出去，请确认好自己的身份。')
                 time.sleep(10)
-                gaming = True
                 sendGroup(groupName, '天黑了，所有人请闭眼。\n杀手出来杀人，私聊法官票选目标。')
-            return '天黑了，所有人请闭眼。\n杀手出来杀人，私聊法官票选目标。'
+                return '天黑了。'
             except:
-                return '未知错误，请联系管理员'
+                return '未知错误，请联系管理员。'
         else:
             return '操作失败，没有等待中的游戏。'
     else:
@@ -256,7 +262,28 @@ def getSpecialAll():
         return plist
     except:
         return [0]
-
+def getKillerAll():
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('select name from player where type = 2')
+        plist = db.fetchall()
+        db.close()
+        conn.close()
+        return plist
+    except:
+        return [0]
+def getGoodAll():
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('select name from player where type = 1')
+        plist = db.fetchall()
+        db.close()
+        conn.close()
+        return plist
+    except:
+        return [0]
 def getNameById(userid):
     try:
         conn = sqlite3.connect('mafia.db')
@@ -455,7 +482,7 @@ def getGameDays(ref):
         db.close()
         conn.commit()
         conn.close()
-        return res
+        return int(res)
     except:
         return '获取游戏天数失败。'
 def getGameTime():
@@ -468,7 +495,7 @@ def getGameTime():
         db.close()
         conn.commit()
         conn.close()
-        return res
+        return int(res)
     except:
         return '获取白天黑夜失败。'
 # 游戏过程
@@ -496,9 +523,10 @@ def setVotableByName(ref):
         return False
 def nextDay():
      try:
+        days = getGameDays()+1
         conn = sqlite3.connect('mafia.db')
         db = conn.cursor()
-        db.execute('select user_id from player where id = ?',(ref,))
+        db.execute('update game set days = days + 1',(ref,))
         res = db.fetchall()
         res = res[0][0]
         db.close()
@@ -507,6 +535,27 @@ def nextDay():
         return '第二天到了。'
     except:
         return '错误，进入下一天失败。'
+def nextTime():
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        now = getGameTime()
+        if(now < 4):
+            db.execute('update game set time = time + 1',(ref,))
+            db.close()
+            conn.commit()
+            conn.close()
+            if (now+1 == 2):
+                return '黄昏来临，杀手即将出现！'
+            if (now+1 == 4):
+                return '天快亮了，请速速投票！'
+        else:
+            db.execute('update game set time = 1',(ref,))
+            db.close()
+            conn.commit()
+            conn.close()     
+    except:
+        return '错误，进入下一时段失败。'
 # 消息处理
 def sendActById(num, act):
     actor = ''
