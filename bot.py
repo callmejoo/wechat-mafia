@@ -41,13 +41,13 @@ def mafia(data):
         
     # 私聊消息处理
     if gaming():
-        players = getPlayerAll()
+        players = getSpecialAll()
         for player in players:
             if(msgFrom.find(player) != -1):
                 if(msg == game['choose']):
                     
                 
-        
+
     
 
 def iinit():
@@ -68,7 +68,7 @@ def newGame():
                 conn = sqlite3.connect('mafia.db')
                 print('有人发起了新游戏')
                 db = conn.cursor()
-                db.execute('create table player (id int, user_id varchar(50), name text primary key, type int, status int, choose int, vote int)')
+                db.execute('create table player (id int, user_id varchar(50), name text primary key, type int, status int, choose int, vote int, votable int)')
                 db.close()
                 conn.commit()
                 conn.close() 
@@ -87,7 +87,7 @@ def joinGame(name, userid):
                 print('有人想加入游戏，游戏人数：'+ getWait())
                 conn = sqlite3.connect('mafia.db')
                 db = conn.cursor()
-                db.execute('insert into player (id, user_id, name) values (?, ?, ?)',(getId(), userid, name,))
+                db.execute('insert into player (id, user_id, name, votable) values (?, ?, ?, 0)',(getId(), userid, name,))
                 db.close()
                 conn.commit()
                 conn.close() 
@@ -160,6 +160,9 @@ def startGame():
                 conn = sqlite3.connect('mafia.db')
                 db = conn.cursor()
                 num = player
+                # 创建游戏进程
+                db.execute('create table game (days int, time int, voting int)')
+                db.execute('insert into game (days) values (1)')
                 for actType in actor:
                     db.execute('update player set type=?,status=? where id=?', (actType, 1,num,))
                     # 发送身份
@@ -179,6 +182,8 @@ def startGame():
             return '操作失败，没有等待中的游戏。'
     else:
          return '操作失败，没有游戏。'
+
+# 获取游戏数据        
 def getId():
     try:
         print('尝试获取玩家数...')
@@ -235,22 +240,23 @@ def getPlayerAll():
         db = conn.cursor()
         db.execute('select name from player')
         plist = db.fetchall()
+        db.close()
+        conn.close()
+        return plist
+    except:
+        return [0]
+def getSpecialAll():
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('select name from player where type != 0')
+        plist = db.fetchall()
+        db.close()
+        conn.close()
         return plist
     except:
         return [0]
 
-def sendActById(num, act):
-    actor = ''
-    if (act == 0):
-        actor = '平民'
-    if  (act == 1):
-        actor = ''
-    conn = sqlite3.connect('mafia.db')
-    db = conn.cursor()
-    db.execute('select * from player where id = ?', (num,))
-    name = db.fetchall()[0]['name']
-    friend = robot.friends().search(name)[0]
-    friend.send('你的身份是： ' + actor)
 def getNameById(userid):
     try:
         conn = sqlite3.connect('mafia.db')
@@ -407,7 +413,115 @@ def getUserIdByName(ref):
         return res
     except:
         return '获取玩家user_id失败。'
-
+def getVotableById(ref):
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('select votable from player where id = ?',(ref,))
+        res = db.fetchall()
+        res = res[0][0]
+        db.close()
+        conn.commit()
+        conn.close()
+        if (res == 0):
+            return False
+        else:
+            return True
+    except:
+        return False
+def getVotableByName(ref):
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('select user_id from player where name = ?',(ref,))
+        res = db.fetchall()
+        res = res[0][0]
+        db.close()
+        conn.commit()
+        conn.close()
+        if (res == 0):
+            return False
+        else:
+            return True
+    except:
+        return False
+def getGameDays(ref):
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('select days from game',(ref,))
+        res = db.fetchall()
+        res = res[0][0]
+        db.close()
+        conn.commit()
+        conn.close()
+        return res
+    except:
+        return '获取游戏天数失败。'
+def getGameTime():
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('select time from game',(ref,))
+        res = db.fetchall()
+        res = res[0][0]
+        db.close()
+        conn.commit()
+        conn.close()
+        return res
+    except:
+        return '获取白天黑夜失败。'
+# 游戏过程
+def setVotableById(ref):
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('update player set votable = 1 where id = ?',(ref,))
+        db.close()
+        conn.commit()
+        conn.close()
+        return True
+    except:
+        return False
+def setVotableByName(ref):
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('update player set votable = 1 where name = ?',(ref,))
+        db.close()
+        conn.commit()
+        conn.close()
+        return True
+    except:
+        return False
+def nextDay():
+     try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('select user_id from player where id = ?',(ref,))
+        res = db.fetchall()
+        res = res[0][0]
+        db.close()
+        conn.commit()
+        conn.close()
+        return '第二天到了。'
+    except:
+        return '错误，进入下一天失败。'
+# 消息处理
+def sendActById(num, act):
+    actor = ''
+    if (act == 0):
+        actor = '平民'
+    if  (act == 1):
+        actor = ''
+    conn = sqlite3.connect('mafia.db')
+    db = conn.cursor()
+    db.execute('select * from player where id = ?', (num,))
+    name = db.fetchall()[0]['name']
+    db.close()
+    conn.close()
+    friend = robot.friends().search(name)[0]
+    friend.send('你的身份是： ' + actor)
 def sendGroup(group, text):
     group = robot.groups().search(group)[0]
     group.send(text)
