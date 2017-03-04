@@ -2,16 +2,22 @@
 
 from wxpy import *
 import sqlite3
+import random
+import time
+import asyncio
+
 conn = sqlite3.connect('mafia.db')
 conn.close()
 robot = Robot('wx.cookie')
 
+groupName = '天黑请闭眼'
 game = {
     'create' : '新游戏',
     'join' : '加入',
     'quit' : '退出',
     'start' : '开始游戏',
-    'end' : '结束游戏'
+    'end' : '结束游戏',
+    'choose' : '票' 
 }
 
 @robot.register()
@@ -19,21 +25,34 @@ def mafia(data):
     msg = data.text
     msgFrom = str(data.chat)
     name = str(data.member)[9:-1]
-    if(msgFrom.find('狼人') != -1):  
+    # 群消息处理
+    if(msgFrom.find(groupName) != -1):  
         if(msg == game['create']):
             return newGame()
         if(msg == game['end']):
             return endGame()
         if(msg == game['join']):
-            return joinGame(name)
+            userid = data.raw['acturename']
+            return joinGame(name, userid)
         if(msg == game['quit']):
             return quitGame(name)
         if(msg == game['start']):
-            
-            
+            return startGame()
+        
+    # 私聊消息处理
+    if gaming():
+        players = getPlayerAll()
+        for player in players:
+            if(msgFrom.find(player) != -1):
+                if(msg == game['choose']):
+                    
+                
+        
+    
 
 def iinit():
     try:
+        conn = sqlite3.connect('mafia.db')
         db = conn.cursor()
         db.execute('create table if not exists user (id int primary key, name varchar(20))')
         db.close()
@@ -43,18 +62,24 @@ def iinit():
     except:
         print('数据库连接失败')
 def newGame():
-    try:
-        conn = sqlite3.connect('mafia.db')
-        print('有人发起了新游戏')
-        db = conn.cursor()
-        db.execute('create table player (id int, name text primary key, type int, status int, choose int, vote int)')
-        db.close()
-        conn.commit()
-        conn.close() 
-        return '游戏创建成功，正在等待玩家加入...\n发送"加入"即可加入游戏。'
-    except:
+    if not gaming():
+        if not waiting():
+            try:
+                conn = sqlite3.connect('mafia.db')
+                print('有人发起了新游戏')
+                db = conn.cursor()
+                db.execute('create table player (id int, user_id varchar(50), name text primary key, type int, status int, choose int, vote int)')
+                db.close()
+                conn.commit()
+                conn.close() 
+                return '游戏创建成功，正在等待玩家加入...\n发送"加入"即可加入游戏。'
+            except:
+                return '未知错误，请联系管理员。'
+        else:
+            return '当前有正在进行中的游戏，请结束游戏后在开新局。'
+    else:
         return '当前有正在进行中的游戏，请结束游戏后在开新局。'
-def joinGame(name):
+def joinGame(name, userid):
     if not gaming():
         if waiting():
             print('有人想加入游戏，游戏人数：'+ getWait())
@@ -62,7 +87,7 @@ def joinGame(name):
                 print('有人想加入游戏，游戏人数：'+ getWait())
                 conn = sqlite3.connect('mafia.db')
                 db = conn.cursor()
-                db.execute('insert into player (id, name) values (?, ?)',(getId(), name,))
+                db.execute('insert into player (id, user_id, name) values (?, ?, ?)',(getId(), userid, name,))
                 db.close()
                 conn.commit()
                 conn.close() 
@@ -116,8 +141,40 @@ def endGame():
 def startGame():
     if not gaming():
         if waiting():
-            num = int(getId())-1
-            
+            player = getWait()
+            killer = getKiller(player)
+            actor = []
+            n = 0
+            while n < killer:
+                n = n+1
+                actor.append(1)
+                actor.append(2)
+            m = 0
+            pm = player-killer*2
+            while m < pm
+                m = m+1
+                actor.append(0)
+            random.shuffle(actor)
+            # 分配角色
+            try:
+                conn = sqlite3.connect('mafia.db')
+                db = conn.cursor()
+                num = player
+                for actType in actor:
+                    db.execute('update player set type=?,status=? where id=?', (actType, 1,num,))
+                    # 发送身份
+                    sendActById(num, act)
+                    num = num-1
+                db.close()
+                conn.commit()
+                conn.close()
+                sendGroup(groupName, '游戏即将在10秒内开始，已将各位的身份私聊发送出去，请确认好自己的身份。')
+                time.sleep(10)
+                gaming = True
+                sendGroup(groupName, '天黑了，所有人请闭眼。\n杀手出来杀人，私聊法官票选目标。')
+            return '天黑了，所有人请闭眼。\n杀手出来杀人，私聊法官票选目标。'
+            except:
+                return '未知错误，请联系管理员'
         else:
             return '操作失败，没有等待中的游戏。'
     else:
@@ -151,8 +208,7 @@ def gaming():
         return True
     except:
         return False
-def waiting():
-    
+def waiting():   
     try:
         conn = sqlite3.connect('mafia.db')
         db = conn.cursor()
@@ -169,6 +225,206 @@ def getWait(plus=0):
         return '还需要 ' + str(7-num+plus) + ' 人即可开始游戏。'
     else:
         return '人数已达到要求。\n你可以继续等待或发送“开始游戏”来开始。'
+def getKiller(num=8):
+    last = num%4
+    killer = (num-last)/4
+    return killer
+def getPlayerAll():
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('select name from player')
+        plist = db.fetchall()
+        return plist
+    except:
+        return [0]
 
+def sendActById(num, act):
+    actor = ''
+    if (act == 0):
+        actor = '平民'
+    if  (act == 1):
+        actor = ''
+    conn = sqlite3.connect('mafia.db')
+    db = conn.cursor()
+    db.execute('select * from player where id = ?', (num,))
+    name = db.fetchall()[0]['name']
+    friend = robot.friends().search(name)[0]
+    friend.send('你的身份是： ' + actor)
+def getNameById(userid):
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('select name from player where id = ?',(userid,))
+        res = db.fetchall()
+        res = res[0][0]
+        db.close()
+        conn.commit()
+        conn.close()
+        return res
+    except:
+        return '获取玩家名称失败。'
+def getIdbyName(name):
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('select id from player where name = ?',(name,))
+        res = db.fetchall()
+        res = res[0][0]
+        db.close()
+        conn.commit()
+        conn.close()
+        return res
+    except:
+        return '获取玩家id失败。'
+def getChoiceById(userid):
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('select choose from player where id = ?',(userid,))
+        res = db.fetchall()
+        res = res[0][0]
+        db.close()
+        conn.commit()
+        conn.close()
+        return res
+    except:
+        return '获取玩家投票目标失败。'
+def getChoiceByName(name):
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('select choose from player where name = ?',(name,))
+        res = db.fetchall()
+        res = res[0][0]
+        db.close()
+        conn.commit()
+        conn.close()
+        return res
+    except:
+        return '获取玩家投票目标失败。'
+def getVoteById(userid):
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('select vote from player where id = ?',(userid,))
+        res = db.fetchall()
+        res = res[0][0]
+        db.close()
+        conn.commit()
+        conn.close()
+        return res
+    except:
+        return '获取玩家票数失败。'
+def getVoteByName(name):
+     try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('select vote from player where name = ?',(name,))
+        res = db.fetchall()
+        res = res[0][0]
+        db.close()
+        conn.commit()
+        conn.close()
+        return res
+    except:
+        return '获取玩家票数失败。'
+def getTypeById(ref):
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('select type from player where id = ?',(ref,))
+        res = db.fetchall()
+        res = res[0][0]
+        db.close()
+        conn.commit()
+        conn.close()
+        return res
+    except:
+        return '获取玩家身份失败。'
+def getTypeByName(ref):
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('select type from player where name = ?',(ref,))
+        res = db.fetchall()
+        res = res[0][0]
+        db.close()
+        conn.commit()
+        conn.close()
+        return res
+    except:
+        return '获取玩家身份失败。'
+def getStatusById(ref):
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('select status from player where id = ?',(ref,))
+        res = db.fetchall()
+        res = res[0][0]
+        db.close()
+        conn.commit()
+        conn.close()
+        return res
+    except:
+        return '获取玩家生存状态失败。'
+def getStatusByName(ref):
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('select status from player where name = ?',(ref,))
+        res = db.fetchall()
+        res = res[0][0]
+        db.close()
+        conn.commit()
+        conn.close()
+        return res
+    except:
+        return '获取玩家生存状态失败。'
+def getUserIdById(ref):
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('select user_id from player where id = ?',(ref,))
+        res = db.fetchall()
+        res = res[0][0]
+        db.close()
+        conn.commit()
+        conn.close()
+        return res
+    except:
+        return '获取玩家user_id失败。'
+def getUserIdByName(ref):
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('select user_id from player where id = ?',(ref,))
+        res = db.fetchall()
+        res = res[0][0]
+        db.close()
+        conn.commit()
+        conn.close()
+        return res
+    except:
+        return '获取玩家user_id失败。'
 
+def sendGroup(group, text):
+    group = robot.groups().search(group)[0]
+    group.send(text)
+def vote(name, who):
+    vote = 'choose=' + str(who)
+    where = 'where name =' + name
+    setValue(vote, where, 'player')
+    return '你投票了 '+str(who)+' 号：'
+def setValue(exe, where, table):
+    try:
+        conn = sqlite3.connect('mafia.db')
+        db = conn.cursor()
+        db.execute('update ? set ? where ?',(table, exe, where,))
+        db.close()
+        conn.commit()
+        conn.close()
+        return '修改字段值成功'
+    except:
+        return '获取字段值失败。'
 robot.start()
